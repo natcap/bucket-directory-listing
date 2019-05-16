@@ -1,40 +1,44 @@
-if (typeof AUTO_TITLE != 'undefined' && AUTO_TITLE == true) {
+if (typeof AUTO_TITLE !== 'undefined' && AUTO_TITLE === true) {
   document.title = location.hostname;
 }
 
-if (typeof GCSBL_IGNORE_PATH == 'undefined' || GCSBL_IGNORE_PATH != true) {
+if (typeof GCSBL_IGNORE_PATH === 'undefined' || GCSBL_IGNORE_PATH !== true) {
   var GCSBL_IGNORE_PATH = false;
 }
 
-if (typeof BUCKET_URL == 'undefined') {
+if (typeof BUCKET_URL === 'undefined') {
   var BUCKET_URL = location.protocol + '//' + location.hostname;
 }
 
-if (typeof BUCKET_NAME != 'undefined') {
-  // if bucket_url does not start with bucket_name,
-  // assume path-style url
-  if (!~BUCKET_URL.indexOf(location.protocol + '//' + BUCKET_NAME)) {
-    BUCKET_URL += '/' + BUCKET_NAME;
-  }
-}
-
-if (typeof GCSB_ROOT_DIR == 'undefined') {
+if (typeof GCSB_ROOT_DIR === 'undefined') {
   var GCSB_ROOT_DIR = '';
 }
 
-if (typeof GCSB_SORT == 'undefined') {
-  var GCSB_SORT = 'DEFAULT';
+if (typeof GCSB_SORT === 'undefined') {
+  var GCSB_SORT = 'A2Z';
 }
 
-if (typeof EXCLUDE_FILE == 'undefined') {
+if (typeof EXCLUDE_FILE === 'undefined') {
   var EXCLUDE_FILE = [];
-} else if (typeof EXCLUDE_FILE == 'string') {
+} else if (typeof EXCLUDE_FILE === 'string') {
   var EXCLUDE_FILE = [EXCLUDE_FILE];
 }
 
 // just for dev, change underscore to dot for production
-const location_hostname = 'localhost:8000'
+var location_hostname = 'localhost:8000'
 
+function sortFilesFunction(a, b) {
+  switch (GCSB_SORT) {
+    case "A2Z":
+      return a.name.localeCompare(b.name);
+    case "Z2A":
+      return a.name.localeCompare(b.name) * -1;
+    case "BIG2SMALL":
+      return a.size / 1 < b.size / 1 ? 1 : -1;
+    case "SMALL2BIG":
+      return a.size / 1 > b.size / 1 ? 1 : -1;
+  }
+}
 
 function getS3Data(marker, html) {
   let gcs_rest_url = createS3QueryUrl(marker);
@@ -56,19 +60,16 @@ function getS3Data(marker, html) {
 function locationToPrefix(loc) {
   // Parse the current URL for a prefix= parameter value to attach
   // to links or append to rest API query
-  var rx = '.*[?&]prefix=' + GCSB_ROOT_DIR + '([^&]+)(&.*)?$';
-  var prefix = '';
+  let rx = '.*[?&]prefix=' + GCSB_ROOT_DIR + '([^&]+)(&.*)?$';
+  let prefix = '';
   if (GCSBL_IGNORE_PATH == false) {
-    var prefix = loc.pathname.replace(/^\//, GCSB_ROOT_DIR);
+    let prefix = loc.pathname.replace(/^\//, GCSB_ROOT_DIR);
   }
-  // search current url for '?prefix='
-  var match = loc.search.match(rx);
+  let match = loc.search.match(rx); // search current url for '?prefix='
   if (match) {
     prefix = GCSB_ROOT_DIR + match[1];
-  } else {
-    if (GCSBL_IGNORE_PATH) {
-      var prefix = GCSB_ROOT_DIR;
-    }
+  } else if (GCSBL_IGNORE_PATH) {
+      prefix = GCSB_ROOT_DIR;
   }
   return prefix;
 }
@@ -112,8 +113,8 @@ function buildNavigation(info) {
 function prepareTable(info) {
 	let dirs = info.prefixes
 	let files = info.items 
-	var content = [];
-	var cols = [45, 30, 15];
+	let content = [];
+	const cols = [45, 30, 15];
 	content.push(padRight('Last Modified', cols[1]) + '  ' + 
 		padRight('Size', cols[2]) + 'Key \n');
 	content.push(new Array(cols[0] + cols[1] + cols[2] + 4).join('-') + '\n');
@@ -135,21 +136,21 @@ function prepareTable(info) {
   //   content.push(row + '\n');
   // }
 
-  	if (dirs){
+	if (dirs) {
 		dirs.forEach(function(dirname) {
-		  	let item = {
-				Key: 'dirkey',
+	  	let item = {
+				Key: dirname,
 				LastModified: '',
 				Size: '',
 				keyText: dirname,
 				href: location.protocol + '//' + location_hostname +
                     location.pathname + '?prefix=' + dirname
-		  	}
-		  	var row = renderRow(item, cols);
-		    // if (!EXCLUDE_FILE.includes(item.Key))
+	  	}
+	  	let row = renderRow(item, cols);
+	    // if (!EXCLUDE_FILE.includes(item.Key))
 			content.push(row + '\n');
 		});
-  	}
+	}
  //  	if (GCSBL_IGNORE_PATH) {
  //        item.href = location.protocol + '//' + location.hostname +
  //                    location.pathname + '?prefix=' + item.Key;
@@ -157,14 +158,21 @@ function prepareTable(info) {
 	// item.href = item.keyText;
 	// }
 	if (files) {
+
+    if (GCSB_SORT !== 'DEFAULT') {
+      let sortedFiles = files;
+      sortedFiles.sort(sortFilesFunction);
+      files = sortedFiles;
+    }
+
 		files.forEach(function(file) {
-		  	let item = {
-				Key: 'filekey',
+	  	let item = {
+				Key: file.name,
 				LastModified: file.updated,
 				Size: bytesToHumanReadable(file.size),
 				keyText: file.name,
 				href: file.mediaLink
-		  	}
+	  	}
 		  	var row = renderRow(item, cols);
 		    // if (!EXCLUDE_FILE.includes(item.Key))
 			content.push(row + '\n');
@@ -203,3 +211,4 @@ function bytesToHumanReadable(sizeInBytes) {
 }
 
 getS3Data();
+
