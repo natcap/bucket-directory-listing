@@ -2,10 +2,6 @@ if (typeof AUTO_TITLE !== 'undefined' && AUTO_TITLE === true) {
   document.title = location.hostname;
 }
 
-if (typeof GCSBL_IGNORE_PATH === 'undefined' || GCSBL_IGNORE_PATH !== true) {
-  var GCSBL_IGNORE_PATH = false;
-}
-
 if (typeof BUCKET_URL === 'undefined') {
   var BUCKET_URL = location.protocol + '//' + location.hostname;
 }
@@ -62,15 +58,11 @@ function locationToPrefix(loc) {
   // to links or append to rest API query
   let rx = '.*[?&]prefix=' + GCSB_ROOT_DIR + '([^&]+)(&.*)?$';
   let prefix = '';
-  if (GCSBL_IGNORE_PATH == false) {
-    let prefix = loc.pathname.replace(/^\//, GCSB_ROOT_DIR);
-  }
+  prefix = loc.pathname.replace(/^\//, GCSB_ROOT_DIR);
   let match = loc.search.match(rx); // search current url for '?prefix='
   if (match) {
     prefix = GCSB_ROOT_DIR + match[1];
-  } else if (GCSBL_IGNORE_PATH) {
-      prefix = GCSB_ROOT_DIR;
-  }
+  } 
   return prefix;
 }
 
@@ -147,8 +139,9 @@ function prepareTable(info) {
                     location.pathname + '?prefix=' + dirname
 	  	}
 	  	let row = renderRow(item, cols);
-	    // if (!EXCLUDE_FILE.includes(item.Key))
-			content.push(row + '\n');
+	    if (!EXCLUDE_FILE.includes(item.Key)) {
+  			content.push(row + '\n');
+      }
 		});
 	}
  //  	if (GCSBL_IGNORE_PATH) {
@@ -173,9 +166,10 @@ function prepareTable(info) {
 				keyText: file.name,
 				href: file.mediaLink
 	  	}
-		  	var row = renderRow(item, cols);
-		    // if (!EXCLUDE_FILE.includes(item.Key))
-			content.push(row + '\n');
+	  	let row = renderRow(item, cols);
+	    if (!EXCLUDE_FILE.includes(item.Key)){
+        content.push(row + '\n');
+      }
 		});
 	}
   return content.join('');
