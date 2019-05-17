@@ -92,7 +92,7 @@ function buildNavigation(info) {
   if (prefix) {
   	content = prefix.split('/').map(function(pathSegment) {
 	  	processedPathSegments =
-	        processedPathSegments + pathSegment + '/'; // formerly encodeURIComponent(pathSegment)
+	        processedPathSegments + pathSegment + '/';
 	    return '<a href="/?prefix=' + processedPathSegments + '">' + pathSegment +
 	             '</a>';	
 	    });
@@ -103,6 +103,8 @@ function buildNavigation(info) {
 }
 
 function prepareTable(info) {
+  // info is the json API response.
+  // Returns html.
 	let dirs = info.prefixes
 	let files = info.items 
 	let content = [];
@@ -112,22 +114,25 @@ function prepareTable(info) {
 	content.push(new Array(cols[0] + cols[1] + cols[2] + 4).join('-') + '\n');
 
   // add ../ at the start of the dir listing, unless we are already at root dir
-  // if (prefix && prefix !== GCSB_ROOT_DIR) {
-  //   var up = prefix.replace(/\/$/, '').split('/').slice(0, -1).concat('').join(
-  //           '/'),  // one directory up
-  //       item =
-  //           {
-  //             Key: up,
-  //             LastModified: '',
-  //             ETag: '',
-  //             Size: '',
-  //             keyText: '../',
-  //             href: GCSBL_IGNORE_PATH ? '?prefix=' + up : '../'
-  //           },
-  //       row = renderRow(item, cols);
-  //   content.push(row + '\n');
-  // }
+  let prefix = locationToPrefix(location)
+  if (prefix && prefix !== GCSB_ROOT_DIR) {
+    var up = prefix.replace(/\/$/, '').split('/').slice(0, -1).concat('').join(
+            '/'),  // one directory up
+        item =
+            {
+              Key: up,
+              LastModified: '',
+              ETag: '',
+              Size: '',
+              keyText: '../',
+              href: location.protocol + '//' + location_hostname +
+                    location.pathname + '?prefix=' + up
+            },
+        row = renderRow(item, cols);
+    content.push(row + '\n');
+  }
 
+  // dirs or 'prefixes' have no size or date and are already ordered by name
 	if (dirs) {
 		dirs.forEach(function(dirname) {
 	  	let item = {
@@ -136,7 +141,7 @@ function prepareTable(info) {
 				Size: '',
 				keyText: dirname,
 				href: location.protocol + '//' + location_hostname +
-                    location.pathname + '?prefix=' + dirname
+              location.pathname + '?prefix=' + dirname
 	  	}
 	  	let row = renderRow(item, cols);
 	    if (!EXCLUDE_FILE.includes(item.Key)) {
@@ -144,20 +149,14 @@ function prepareTable(info) {
       }
 		});
 	}
- //  	if (GCSBL_IGNORE_PATH) {
- //        item.href = location.protocol + '//' + location.hostname +
- //                    location.pathname + '?prefix=' + item.Key;
-	// } else {
-	// item.href = item.keyText;
-	// }
-	if (files) {
 
+  // files or 'items' have various properties and no obvious default ordering
+	if (files) {
     if (GCSB_SORT !== 'DEFAULT') {
       let sortedFiles = files;
       sortedFiles.sort(sortFilesFunction);
       files = sortedFiles;
     }
-
 		files.forEach(function(file) {
 	  	let item = {
 				Key: file.name,
@@ -203,6 +202,7 @@ function bytesToHumanReadable(sizeInBytes) {
   } while (sizeInBytes > 1024);
   return Math.max(sizeInBytes, 0.1).toFixed(1) + units[i];
 }
+
 
 getS3Data();
 
