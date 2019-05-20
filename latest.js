@@ -16,13 +16,11 @@ async function locationHashLatest() {
   // if the URL doesn't match, load directory listing as normal.
   let latest = await readLatestInstallers(LATEST)
   if (typeof latest !== 'undefined') {
-    if (location.hash === '#latest-invest-windows') {
-      window.location.href = latest['invest-windows']
-    } else if (location.hash === '#latest-invest-mac') {
-      window.location.href = latest['invest-mac']
-    } else if (location.hash === '#latest-invest-userguide') {
-      window.location.href = latest['invest-userguide']
-    }  
+    if (Object.keys(latest).includes(location.hash)) {
+      window.location.href = latest[location.hash]
+    } else {
+      console.warn(location.hash + ' is not found in latest.json');
+    }
   }
 }
 

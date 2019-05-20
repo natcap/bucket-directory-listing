@@ -1,5 +1,5 @@
 {
-  "invest-windows": "http://releases.naturalcapitalproject.org/invest/3.7.0/InVEST_3.7.0_x86_Setup.exe",
-  "invest-mac": "http://releases.naturalcapitalproject.org/invest/3.7.0/InVEST-3.7.0-mac.zip",
-  "invest-userguide": "http://releases.naturalcapitalproject.org/invest-userguide/latest/"
+  "#latest-invest-windows": "http://releases.naturalcapitalproject.org/invest/3.7.0/InVEST_3.7.0_x86_Setup.exe",
+  "#latest-invest-mac": "http://releases.naturalcapitalproject.org/invest/3.7.0/InVEST-3.7.0-mac.zip",
+  "#latest-invest-userguide": "http://releases.naturalcapitalproject.org/invest-userguide/latest/"
 }
