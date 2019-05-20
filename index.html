@@ -8,11 +8,12 @@
   <div id="listing"></div>
 <script type="text/javascript">
   var BUCKET_URL = 'https://www.googleapis.com/storage/v1/b/releases.naturalcapitalproject.org/o';
-  // exclude listing specific files or folders. use trailing / for folder names.
-  var EXCLUDE_FILE = ['index.html', 'bucketlist.js'];
+  var EXCLUDE_FILE = [
+	  'index.html', 'bucketlist.js', 'latest.json']; // use trailing / for folders.
   var AUTO_TITLE = true; // override <title> with this file's hostname
   // var GCSB_ROOT_DIR = 'invest/'; // start from here and prohibit nav to shallower folders
 </script>
 <script type="text/javascript" src="bucketlist.js"></script>
+<script type="text/javascript" src="latest.js"></script>
 </body>
 </html>
