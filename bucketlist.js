@@ -1,30 +1,27 @@
 if (typeof AUTO_TITLE !== 'undefined' && AUTO_TITLE === true) {
-  document.title = location.hostname;
+  document.title = location.host;
 }
 
-if (typeof BUCKET_URL === 'undefined') {
-  var BUCKET_URL = location.protocol + '//' + location.hostname;
+if (typeof CONFIG.bucket_url === 'undefined') {
+  CONFIG.bucket_url = location.protocol + '//' + location.host;
 }
 
-if (typeof GCSB_ROOT_DIR === 'undefined') {
-  var GCSB_ROOT_DIR = '';
+if (typeof CONFIG.root_dir === 'undefined') {
+  CONFIG.root_dir = '';
 }
 
-if (typeof GCSB_SORT === 'undefined') {
-  var GCSB_SORT = 'A2Z';
+if (typeof CONFIG.sort_option === 'undefined') {
+  CONFIG.sort_option = 'A2Z';
 }
 
-if (typeof EXCLUDE_FILE === 'undefined') {
-  var EXCLUDE_FILE = [];
-} else if (typeof EXCLUDE_FILE === 'string') {
-  var EXCLUDE_FILE = [EXCLUDE_FILE];
+if (typeof CONFIG.exclude_files === 'undefined') {
+  CONFIG.exclude_files = [];
+} else if (typeof CONFIG.exclude_files === 'string') {
+  CONFIG.exclude_files = [CONFIG.exclude_files];
 }
-
-// just for dev, change underscore to dot for production
-var location_hostname = 'localhost:8000'
 
 function sortFilesFunction(a, b) {
-  switch (GCSB_SORT) {
+  switch (CONFIG.sort_option) {
     case "A2Z":
       return a.name.localeCompare(b.name);
     case "Z2A":
@@ -56,12 +53,12 @@ function getS3Data(marker, html) {
 function locationToPrefix(loc) {
   // Parse the current URL for a prefix= parameter value to attach
   // to links or append to rest API query
-  let rx = '.*[?&]prefix=' + GCSB_ROOT_DIR + '([^&]+)(&.*)?$';
+  let rx = '.*[?&]prefix=' + CONFIG.root_dir + '([^&]+)(&.*)?$';
   let prefix = '';
-  prefix = loc.pathname.replace(/^\//, GCSB_ROOT_DIR);
+  prefix = loc.pathname.replace(/^\//, CONFIG.root_dir);
   let match = loc.search.match(rx); // search current url for '?prefix='
   if (match) {
-    prefix = GCSB_ROOT_DIR + match[1];
+    prefix = CONFIG.root_dir + match[1];
   } 
   return prefix;
 }
@@ -69,7 +66,7 @@ function locationToPrefix(loc) {
 function createS3QueryUrl(marker) {
   // Build an API query by parsing a url for prefix= query parameter
   // and append param to the rest API endpoint
-  let gcs_rest_url = BUCKET_URL;
+  let gcs_rest_url = CONFIG.bucket_url;
   gcs_rest_url += '?delimiter=/';
   let prefix = locationToPrefix(location);
   if (prefix) {
@@ -85,7 +82,7 @@ function createS3QueryUrl(marker) {
 
 function buildNavigation(info) {
   // Build links that can be parsed for a prefix= query parameter.
-  const root = '<a href="/">' + location_hostname + '</a> / '; // todo '_' -> '.' for prodcution
+  const root = '<a href="/">' + location.host + '</a> / '; // todo '_' -> '.' for prodcution
   let content = [];
   let prefix = locationToPrefix(location)
   let processedPathSegments = ''
@@ -115,7 +112,7 @@ function prepareTable(info) {
 
   // add ../ at the start of the dir listing, unless we are already at root dir
   let prefix = locationToPrefix(location)
-  if (prefix && prefix !== GCSB_ROOT_DIR) {
+  if (prefix && prefix !== CONFIG.root_dir) {
     var up = prefix.replace(/\/$/, '').split('/').slice(0, -1).concat('').join(
             '/'),  // one directory up
         item =
@@ -125,7 +122,7 @@ function prepareTable(info) {
               ETag: '',
               Size: '',
               keyText: '../',
-              href: location.protocol + '//' + location_hostname +
+              href: location.protocol + '//' + location.host +
                     location.pathname + '?prefix=' + up
             },
         row = renderRow(item, cols);
@@ -140,11 +137,11 @@ function prepareTable(info) {
 				LastModified: '',
 				Size: '',
 				keyText: dirname,
-				href: location.protocol + '//' + location_hostname +
+				href: location.protocol + '//' + location.host +
               location.pathname + '?prefix=' + dirname
 	  	}
 	  	let row = renderRow(item, cols);
-	    if (!EXCLUDE_FILE.includes(item.Key)) {
+	    if (!CONFIG.exclude_files.includes(item.Key)) {
   			content.push(row + '\n');
       }
 		});
@@ -152,7 +149,7 @@ function prepareTable(info) {
 
   // files or 'items' have various properties and no obvious default ordering
 	if (files) {
-    if (GCSB_SORT !== 'DEFAULT') {
+    if (CONFIG.sort_option !== 'DEFAULT') {
       let sortedFiles = files;
       sortedFiles.sort(sortFilesFunction);
       files = sortedFiles;
@@ -166,7 +163,7 @@ function prepareTable(info) {
 				href: file.mediaLink
 	  	}
 	  	let row = renderRow(item, cols);
-	    if (!EXCLUDE_FILE.includes(item.Key)){
+	    if (!CONFIG.exclude_files.includes(item.Key)){
         content.push(row + '\n');
       }
 		});
