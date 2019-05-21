@@ -1,3 +1,6 @@
+import { listing_config } from './config.js';
+var CONFIG = listing_config[location.host]
+
 if (typeof AUTO_TITLE !== 'undefined' && AUTO_TITLE === true) {
   document.title = location.host;
 }
