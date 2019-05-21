@@ -36,26 +36,33 @@ function sortFilesFunction(a, b) {
   }
 }
 
-function getS3Data(marker, html) {
-  let gcs_rest_url = createS3QueryUrl(marker);
+function getS3Data(pageToken, html) {
+  // fetches JSON format bucket metadata from bucket's endpoint.
+  // pageToken and html parameters are optional
+  // and are only used in the event the query requests > 1000 objects.
+  let gcs_rest_url = createS3QueryUrl(pageToken);
   fetch(gcs_rest_url)
-  	// todo check if response was truncated because of too many objects
   	.then(function(response) {
-	  	return response.json();
+      if (response.status === 200) {
+        return response.json();  
+      } else {
+        console.log(response.status);
+      }
   	})
   	.then(function(data) {
   		buildNavigation(data);
-  		html = typeof html !== 'undefined' ? html + prepareTable(data) :
-                                             prepareTable(data);
-
-		document.getElementById('listing').innerHTML = 
-			'<pre>' + html + '</pre>';
+  		html = typeof html !== 'undefined' ? html + prepareTable(data) : prepareTable(data);
+      if (data.nextPageToken) {
+        getS3Data(data.nextPageToken, html)
+      } else {
+        document.getElementById('listing').innerHTML = '<pre>' + prepareTableHeader() + html + '</pre>';
+      }
   	})
 }
 
 function locationToPrefix(loc) {
   // Parse the current URL for a prefix= parameter value to attach
-  // to links or append to rest API query
+  // to links or append to API query
   let rx = '.*[?&]prefix=' + CONFIG.root_dir + '([^&]+)(&.*)?$';
   let prefix = '';
   prefix = loc.pathname.replace(/^\//, CONFIG.root_dir);
@@ -66,9 +73,10 @@ function locationToPrefix(loc) {
   return prefix;
 }
 
-function createS3QueryUrl(marker) {
+function createS3QueryUrl(pageToken, maxResults) {
   // Build an API query by parsing a url for prefix= query parameter
-  // and append param to the rest API endpoint
+  // and append param to the API endpoint.
+  // pageToken and maxResults parameters are both optional.
   let gcs_rest_url = CONFIG.bucket_url;
   gcs_rest_url += '?delimiter=/';
   let prefix = locationToPrefix(location);
@@ -77,15 +85,18 @@ function createS3QueryUrl(marker) {
     prefix = prefix.replace(/\/$/, '') + '/';
     gcs_rest_url += '&prefix=' + encodeURIComponent(prefix);
   }
-  if (marker) {
-    gcs_rest_url += '&marker=' + marker;
+  if (maxResults) {
+    gcs_rest_url += '&maxResults=' + maxResults
+  }
+  if (pageToken) {
+    gcs_rest_url += '&pageToken=' + pageToken;
   }
   return gcs_rest_url;
 }
 
 function buildNavigation(info) {
-  // Build links that can be parsed for a prefix= query parameter.
-  const root = '<a href="/">' + location.host + '</a> / '; // todo '_' -> '.' for prodcution
+  // Build links that can be parsed for a 'prefix=' query parameter.
+  const root = '<a href="/">' + location.host + '</a> / ';
   let content = [];
   let prefix = locationToPrefix(location)
   let processedPathSegments = ''
@@ -102,18 +113,16 @@ function buildNavigation(info) {
   }
 }
 
-function prepareTable(info) {
-  // info is the json API response.
-  // Returns html.
-	let dirs = info.prefixes
-	let files = info.items 
-	let content = [];
-	const cols = [45, 30, 15];
-	content.push(padRight('Last Modified', cols[1]) + '  ' + 
-		padRight('Size', cols[2]) + 'Key \n');
-	content.push(new Array(cols[0] + cols[1] + cols[2] + 4).join('-') + '\n');
+function prepareTableHeader() {
+  // Last Modified                   Size           Key 
+  // ---------------------------------------------------
+  //                                                ../
 
-  // add ../ at the start of the dir listing, unless we are already at root dir
+  let content = [];
+  const cols = COLS;
+  content.push(padRight('Last Modified', cols[1]) + '  ' + 
+    padRight('Size', cols[2]) + 'Key \n');
+  content.push(new Array(cols[0] + cols[1] + cols[2] + 4).join('-') + '\n');
   let prefix = locationToPrefix(location)
   if (prefix && prefix !== CONFIG.root_dir) {
     var up = prefix.replace(/\/$/, '').split('/').slice(0, -1).concat('').join(
@@ -131,7 +140,17 @@ function prepareTable(info) {
         row = renderRow(item, cols);
     content.push(row + '\n');
   }
+  return content.join('');
+}
 
+function prepareTable(info) {
+  // info is the json API response.
+  // Returns preformatted text for use inside <pre></pre> tags
+	let dirs = info.prefixes
+	let files = info.items 
+	let content = [];
+	const cols = COLS;
+	
   // dirs or 'prefixes' have no size or date and are already ordered by name
 	if (dirs) {
 		dirs.forEach(function(dirname) {
@@ -203,5 +222,6 @@ function bytesToHumanReadable(sizeInBytes) {
   return Math.max(sizeInBytes, 0.1).toFixed(1) + units[i];
 }
 
+const COLS = [45, 30, 15];
 getS3Data();
 
