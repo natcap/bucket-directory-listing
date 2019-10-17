@@ -182,8 +182,13 @@ function prepareTable(info) {
 				LastModified: file.updated,
 				Size: bytesToHumanReadable(file.size),
 				keyText: file.name,
-				href: file.mediaLink
+				href: ''
 	  	}
+      if (file.name.endsWith('.html')) {
+        item.href = location.protocol + '//' + location.host + '/' + file.name
+      } else {
+        item.href = file.mediaLink
+      }
 	  	let row = renderRow(item, cols);
 	    if (!CONFIG.exclude_files.includes(item.Key)){
         content.push(row + '\n');
