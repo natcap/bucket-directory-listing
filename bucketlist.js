@@ -188,6 +188,7 @@ function prepareTable(info) {
         item.href = location.protocol + '//' + location.host + '/' + file.name
       } else {
         item.href = file.mediaLink
+        item.download = file.name.split('/').slice(-1)[0]
       }
 	  	let row = renderRow(item, cols);
 	    if (!CONFIG.exclude_files.includes(item.Key)){
@@ -202,7 +203,17 @@ function renderRow(item, cols) {
   var row = '';
   row += padRight(item.LastModified, cols[1]) + '  ';
   row += padRight(item.Size, cols[2]);
-  row += '<a href="' + item.href + '">' + item.keyText + '</a>';
+  
+  // The download attribute allows override of default download filename.
+  // It also forces a download instead of a redirect, regardless of whether
+  // there is a download value. So be careful which items get this property.
+  // Finally, the download value is only honored on same-origin resources,
+  // so behavior here will be different in development vs production.
+  if (item.download) {
+    row += '<a href="' + item.href + '" download="' + item.download + '">' + item.keyText + '</a>';
+  } else {
+    row += '<a href="' + item.href + '">' + item.keyText + '</a>';
+  }
   return row;
 }
 
