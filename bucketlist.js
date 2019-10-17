@@ -209,6 +209,7 @@ function renderRow(item, cols) {
   // there is a download value. So be careful which items get this property.
   // Finally, the download value is only honored on same-origin resources,
   // so behavior here will be different in development vs production.
+  // TODO: the download value is in fact being ignored in production.
   if (item.download) {
     row += '<a href="' + item.href + '" download="' + item.download + '">' + item.keyText + '</a>';
   } else {
