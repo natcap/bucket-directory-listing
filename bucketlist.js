@@ -23,6 +23,10 @@ if (typeof CONFIG.exclude_files === 'undefined') {
   CONFIG.exclude_files = [CONFIG.exclude_files];
 }
 
+function isRelease(str) {
+  return str.split('.').length === 3
+}
+
 function sortFilesFunction(a, b) {
   switch (CONFIG.sort_option) {
     case "A2Z":
@@ -33,6 +37,26 @@ function sortFilesFunction(a, b) {
       return a.size / 1 < b.size / 1 ? 1 : -1;
     case "SMALL2BIG":
       return a.size / 1 > b.size / 1 ? 1 : -1;
+  }
+}
+
+const sortFuncs = {
+  semver: function(a, b) {
+    const semverA = a.split('/').slice(-2).join('').split('.');
+    const semverB = b.split('/').slice(-2).join('').split('.');
+    for (let i = 0; i < 3; i++) {
+      if (semverA[i] !== semverB[i]) {
+        return semverA[i] < semverB[i] ? 1 : -1
+      }
+      continue
+    }
+    let postA = semverA[3] ? semverA[3] : 0;
+    let postB = semverB[3] ? semverB[3] : 0;
+    if (postA === 0) { return -1 };
+    if (postB === 0) { return 1 };
+    postA = Number(semverA[3].split('+')[0].replace('post', ''));
+    postB = Number(semverB[3].split('+')[0].replace('post', ''));
+    return postA < postB ? 1 : -1
   }
 }
 
@@ -89,23 +113,15 @@ function buildNavigation(info) {
   }
 }
 
-function renderRow(item, cols) {
+function renderRow(item, cols, isSubheader) {
   var row = '';
   row += padRight(item.LastModified, cols[1]) + '  ';
   row += padRight(item.Size, cols[2]);
-  
-  // The download attribute allows override of default download filename.
-  // It also forces a download instead of a redirect, regardless of whether
-  // there is a download value. So be careful which items get this property.
-  // Finally, the download value is only honored on same-origin resources,
-  // so behavior here will be different in development vs production.
-  // TODO: the download value is in fact being ignored in production.
-  if (item.download) {
-    row += '<a href="' + item.href + '" download="' + item.download + '">' + item.keyText + '</a>';
-  } else {
-    row += '<a href="' + item.href + '">' + item.keyText + '</a>';
+  row += '<a href="' + item.href + '">' + item.keyText + '</a>';
+  if (!isSubheader) {
+    return row
   }
-  return row;
+  return `<h4>${row}</h4>`;
 }
 
 function prepareTableHeader() {
@@ -138,7 +154,7 @@ function prepareTableHeader() {
   return content.join('');
 }
 
-function prepareTable(info) {
+function prepareTable(info, sortFunc) {
   // info is the json API response.
   // Returns preformatted text for use inside <pre></pre> tags
   let dirs = info.prefixes
@@ -148,6 +164,11 @@ function prepareTable(info) {
   
   // dirs or 'prefixes' have no size or date and are already ordered by name
   if (dirs) {
+    if (sortFunc) {
+      let sortedDirs = dirs;
+      sortedDirs.sort(sortFunc);
+      dirs = sortedDirs;
+    }
     dirs.forEach(function(dirname) {
       let item = {
         Key: dirname,
@@ -157,7 +178,8 @@ function prepareTable(info) {
         href: location.protocol + '//' + location.host +
               location.pathname + '?prefix=' + dirname
       }
-      let row = renderRow(item, cols);
+      const isSubheader = isRelease(item.keyText);
+      let row = renderRow(item, cols, isSubheader);
       if (!CONFIG.exclude_files.includes(item.Key)) {
         content.push(row + '\n');
       }
@@ -206,14 +228,14 @@ function createS3QueryUrl(pageToken, maxResults) {
   if (pageToken) {
     gcs_rest_url += '&pageToken=' + pageToken;
   }
-  return gcs_rest_url;
+  return [ gcs_rest_url, prefix ];
 }
 
 function getS3Data(pageToken, html) {
   // fetches JSON format bucket metadata from bucket's endpoint.
   // pageToken and html parameters are optional
   // and are only used in the event the query requests > 1000 objects.
-  let gcs_rest_url = createS3QueryUrl(pageToken);
+  let [ gcs_rest_url, prefix ] = createS3QueryUrl(pageToken);
   fetch(gcs_rest_url)
   	.then(function(response) {
       if (response.status === 200) {
@@ -224,9 +246,12 @@ function getS3Data(pageToken, html) {
   	})
   	.then(function(data) {
   		buildNavigation(data);
+      const sortName = CONFIG.prefix_sort_map[
+        prefix.split('/').slice(-2).join('/')
+      ];
   		html = typeof html !== 'undefined'
-        ? html + prepareTable(data)
-        : prepareTable(data);
+        ? html + prepareTable(data, sortFuncs[sortName])
+        : prepareTable(data, sortFuncs[sortName]);
       if (data.nextPageToken) {
         getS3Data(data.nextPageToken, html)
       } else {
