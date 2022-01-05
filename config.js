@@ -5,7 +5,7 @@ var listing_config = {
 		exclude_files: ["index.html", "bucketlist.js", "config.js", "readme.md" , "robots.txt"],
 		// If entries under a special prefix should be sorted in a special way
 		prefix_sort_map: {
-			"invest": "semver"
+			"invest/": "semver"
 		},
 		// sort_option: "A2Z", // 'A2Z', 'Z2A', 'BIG2SMALL', 'SMALL2BIG'
 		// root_dir: "invest/",

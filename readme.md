@@ -10,4 +10,4 @@ make sure `config.js` has a listing for the bucket where you wish to deploy
 
 ## Deploy: 
 `cd bucket-directory-listing`  
-`gsutil -m rsync . gs://releases.naturalcapitalproject.org`
+`gsutil -m rsync -n . gs://releases.naturalcapitalproject.org`
