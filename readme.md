@@ -11,3 +11,9 @@ make sure `config.js` has a listing for the bucket where you wish to deploy
 ## Deploy: 
 `cd bucket-directory-listing`  
 `gsutil -m rsync -n . gs://releases.naturalcapitalproject.org`
+
+After deploying I needed to manually edit the "Type" of the javascript files.
+By default they receive "text/plain". The file's metadata can be
+edited to change the content type to "application/javascript", which is
+necessary for the client browser to accept them. I don't recall needing
+to do this in the past.
