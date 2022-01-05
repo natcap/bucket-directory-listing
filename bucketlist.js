@@ -46,14 +46,14 @@ const sortFuncs = {
     const semverB = b.split('/').slice(-2).join('').split('.');
     for (let i = 0; i < 3; i++) {
       if (semverA[i] !== semverB[i]) {
-        return semverA[i] < semverB[i] ? 1 : -1
+        return Number(semverA[i]) < Number(semverB[i]) ? 1 : -1
       }
       continue
     }
     let postA = semverA[3] ? semverA[3] : 0;
     let postB = semverB[3] ? semverB[3] : 0;
-    if (postA === 0) { return -1 };
-    if (postB === 0) { return 1 };
+    if (postA === 0) { return 1 };
+    if (postB === 0) { return -1 };
     postA = Number(semverA[3].split('+')[0].replace('post', ''));
     postB = Number(semverB[3].split('+')[0].replace('post', ''));
     return postA < postB ? 1 : -1
