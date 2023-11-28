@@ -44,11 +44,15 @@ const sortFuncs = {
   semver: function(a, b) {
     const semverA = a.split('/').slice(-2).join('').split('.');
     const semverB = b.split('/').slice(-2).join('').split('.');
+
     for (let i = 0; i < 3; i++) {
       if (semverA[i] !== semverB[i]) {
-        return Number(semverA[i]) < Number(semverB[i]) ? 1 : -1
+        const numA = Number(semverA[i]);
+        const numB = Number(semverB[i]);
+        if (isNaN(numA)) { console.log(semverA[i]); return 1 }
+        if (isNaN(numB)) { console.log(semverB[i]); return -1 }
+        return numA < numB ? 1 : -1
       }
-      continue
     }
     let postA = semverA[3] ? semverA[3] : 0;
     let postB = semverB[3] ? semverB[3] : 0;
@@ -94,7 +98,7 @@ function locationToPrefix(loc) {
   return prefix;
 }
 
-function buildNavigation(info) {
+function buildNavigation() {
   // Build links that can be parsed for a 'prefix=' query parameter.
   const root = '<a href="/">' + location.host + '</a> / ';
   let content = [];
@@ -231,7 +235,7 @@ function createS3QueryUrl(pageToken, maxResults) {
   return [ gcs_rest_url, prefix ];
 }
 
-function getS3Data(pageToken, html) {
+function getS3Data(pageToken, storageObjects={prefixes: [], items: []}) {
   // fetches JSON format bucket metadata from bucket's endpoint.
   // pageToken and html parameters are optional
   // and are only used in the event the query requests > 1000 objects.
@@ -245,16 +249,20 @@ function getS3Data(pageToken, html) {
       }
   	})
   	.then(function(data) {
-  		buildNavigation(data);
+      if (data.prefixes) {
+        storageObjects['prefixes'].push(...data['prefixes'])
+      }
+      if (data.items) {
+        storageObjects['items'].push(...data['items'])
+      }
+  		buildNavigation();
       const sortName = CONFIG.prefix_sort_map[
         prefix.split('/').slice(-2).join('/')
       ];
-  		html = typeof html !== 'undefined'
-        ? html + prepareTable(data, sortFuncs[sortName])
-        : prepareTable(data, sortFuncs[sortName]);
       if (data.nextPageToken) {
-        getS3Data(data.nextPageToken, html)
+        getS3Data(data.nextPageToken, storageObjects)
       } else {
+        const html = prepareTable(storageObjects, sortFuncs[sortName]);
         document.getElementById('listing')
           .innerHTML = '<pre>' + prepareTableHeader() + html + '</pre>';
       }
