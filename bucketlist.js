@@ -49,8 +49,8 @@ const sortFuncs = {
       if (semverA[i] !== semverB[i]) {
         const numA = Number(semverA[i]);
         const numB = Number(semverB[i]);
-        if (isNaN(numA)) { console.log(semverA[i]); return 1 }
-        if (isNaN(numB)) { console.log(semverB[i]); return -1 }
+        if (isNaN(numA)) { return 1 }
+        if (isNaN(numB)) { return -1 }
         return numA < numB ? 1 : -1
       }
     }
@@ -214,13 +214,53 @@ function prepareTable(info, sortFunc) {
   return content.join('');
 }
 
-function createS3QueryUrl(pageToken, maxResults) {
-  // Build an API query by parsing a url for prefix= query parameter
-  // and append param to the API endpoint.
-  // pageToken and maxResults parameters are both optional.
+// objects are compared to offset ranges in lexicographic order.
+// These ranges ensure no overlap among each other,
+// and allow for 989 bugfix versions per minor version.
+const INVEST_OFFSETS = [
+  ['3.0.0', '3.0.99'],
+  ['3.1.0', '3.1.99'],
+  ['3.2.0', '3.2.99'],
+  ['3.3.0', '3.3.99'],
+  ['3.4.0', '3.4.99'],
+  ['3.5.0', '3.5.99'],
+  ['3.6.0', '3.6.99'],
+  ['3.7.0', '3.7.99'],
+  ['3.8.0', '3.8.99'],
+  ['3.9.0', '3.9.99'],
+  ['3.10.0', '3.10.99'],
+  ['3.11.0', '3.11.99'],
+  ['3.12.0', '3.12.99'],
+  ['3.13.0', '3.13.99'],
+  ['3.14.0', '3.14.99'],
+  ['3.15.0', '3.15.99'],
+  ['3.16.0', '3.16.99'],
+  ['3.17.0', '3.17.99'],
+  ['3.18.0', '3.18.99'],
+  ['3.19.0', '3.19.99'],
+  ['3.20.0', '3.20.99'],
+  ['3.21.0', '3.21.99'],
+  ['3.22.0', '3.22.99'],
+  ['3.23.0', '3.23.99'],
+  ['3.24.0', '3.24.99'],
+  ['3.25.0', '3.30.99'],
+  ['3.31.0', '3.99.99'],
+  ['4.0.0', '9.0.0'],
+]
+
+function getS3Data(pageToken, startOffset, endOffset, storageObjects={prefixes: [], items: []}) {
+  // fetches JSON format bucket metadata from bucket's endpoint.
+  // all parameters are optional
+  // pageToken should be used in conjunction with the same start and endOffset
+  // that were used in the prior query that returned the nextPageToken.
+  const maxResults = 1000;
+  let objects = {prefixes: [], items: []};
+  Object.assign(objects, storageObjects);
   let gcs_rest_url = CONFIG.bucket_url;
-  gcs_rest_url += '?delimiter=/';
+  let urlArray = [];
   let prefix = locationToPrefix(location);
+  gcs_rest_url += '?delimiter=/';
+
   if (prefix) {
     // make sure we end in /
     prefix = prefix.replace(/\/$/, '') + '/';
@@ -230,43 +270,60 @@ function createS3QueryUrl(pageToken, maxResults) {
     gcs_rest_url += '&maxResults=' + maxResults
   }
   if (pageToken) {
-    gcs_rest_url += '&pageToken=' + pageToken;
+    gcs_rest_url += '&pageToken=' + pageToken
+    if (startOffset) {
+      gcs_rest_url += `&startOffset=${startOffset}`
+    }
+    if (endOffset) {
+      gcs_rest_url += `&endOffset=${endOffset}`
+    }
+    urlArray.push(gcs_rest_url);
+  } else if (prefix == 'invest/') {
+      urlArray = INVEST_OFFSETS.map(([start, end]) => {
+        let url = gcs_rest_url;
+        url += `&startOffset=invest/${start}`
+        url += `&endOffset=invest/${end}`
+        return url;
+      })
+  } else {
+    urlArray.push(gcs_rest_url);
   }
-  return [ gcs_rest_url, prefix ];
-}
 
-function getS3Data(pageToken, storageObjects={prefixes: [], items: []}) {
-  // fetches JSON format bucket metadata from bucket's endpoint.
-  // pageToken and html parameters are optional
-  // and are only used in the event the query requests > 1000 objects.
-  let [ gcs_rest_url, prefix ] = createS3QueryUrl(pageToken);
-  fetch(gcs_rest_url)
-  	.then(function(response) {
-      if (response.status === 200) {
-        return response.json();  
-      } else {
-        console.log(response.status);
-      }
-  	})
-  	.then(function(data) {
-      if (data.prefixes) {
-        storageObjects['prefixes'].push(...data['prefixes'])
-      }
-      if (data.items) {
-        storageObjects['items'].push(...data['items'])
-      }
-  		buildNavigation();
-      const sortName = CONFIG.prefix_sort_map[
-        prefix.split('/').slice(-2).join('/')
-      ];
-      if (data.nextPageToken) {
-        getS3Data(data.nextPageToken, storageObjects)
-      } else {
-        const html = prepareTable(storageObjects, sortFuncs[sortName]);
+  Promise.all(urlArray.map(url => fetch(url)))
+    .then((responses) => {
+      Promise.all(responses.map(response => {
+        if (response.status === 200) {
+          return response.json();  
+        } else {
+          console.log(response.status);
+        }
+      }))
+      .then((dataArray) => {
+        dataArray.forEach((data, idx) => {
+          if (data.prefixes) {
+            objects['prefixes'].push(...data['prefixes'])
+          }
+          if (data.items) {
+            objects['items'].push(...data['items'])
+          }
+          if (data.nextPageToken) {
+            const params = new URLSearchParams(urlArray[idx]);
+            const startOffset = params.get('startOffset');
+            const endOffset = params.get('endOffset');
+            getS3Data(data.nextPageToken, startOffset, endOffset, objects)
+          }
+        });
+      })
+      .then(() => {
+        const html = prepareTable(objects, sortFuncs[sortName]);
         document.getElementById('listing')
           .innerHTML = '<pre>' + prepareTableHeader() + html + '</pre>';
-      }
-  	})
+      })
+    })
+    buildNavigation();
+    const sortName = CONFIG.prefix_sort_map[
+      prefix.split('/').slice(-2).join('/')
+    ];
 }
 
 const COLS = [45, 30, 15];
