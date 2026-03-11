@@ -42,25 +42,40 @@ function sortFilesFunction(a, b) {
 
 const sortFuncs = {
   semver: function(a, b) {
+    // split into <major>.<minor>.<bugfix>.<post / dev>
     const semverA = a.split('/').slice(-2).join('').split('.');
     const semverB = b.split('/').slice(-2).join('').split('.');
 
+    // simple comparison based on major, minor, bugfix numbers
     for (let i = 0; i < 3; i++) {
       if (semverA[i] !== semverB[i]) {
         const numA = Number(semverA[i]);
         const numB = Number(semverB[i]);
+
+        // an 'a' for alpha is part of the bugfix number on rare occassions
+        // if it's NaN, just don't bother trying
         if (isNaN(numA)) { return 1 }
         if (isNaN(numB)) { return -1 }
+        
         return numA < numB ? 1 : -1
       }
     }
-    let postA = semverA[3] ? semverA[3] : 0;
-    let postB = semverB[3] ? semverB[3] : 0;
-    if (postA === 0) { return 1 };
-    if (postB === 0) { return -1 };
-    postA = Number(semverA[3].split('+')[0].replace('post', ''));
-    postB = Number(semverB[3].split('+')[0].replace('post', ''));
-    return postA < postB ? 1 : -1
+    // if versions are the same down to the bugfix,
+    let suffixA = semverA[3] ? semverA[3] : '';
+    let suffixB = semverB[3] ? semverB[3] : '';
+    if (suffixA.startsWith('post') || suffixB.startsWith('post')) {
+      // 3.4.5.post* goes after 3.4.5
+      if (suffixA === '') { return 1 };
+      if (suffixB === '') { return -1 };
+    }
+    if (suffixA.startsWith('dev') || suffixB.startsWith('dev')) {
+      // 3.4.5.dev* goes before 3.4.5
+      if (suffixA === '') { return -1 };
+      if (suffixB === '') { return 1 };
+    }
+    const intA = Number(suffixA.split('+')[0].replace(/post|dev/, ''));
+    const intB = Number(suffixB.split('+')[0].replace(/post|dev/, ''));
+    return intA < intB ? 1 : -1
   }
 }
 
@@ -243,8 +258,14 @@ const INVEST_OFFSETS = [
   ['3.22.0', '3.22.99'],
   ['3.23.0', '3.23.99'],
   ['3.24.0', '3.24.99'],
-  ['3.25.0', '3.30.99'],
-  ['3.31.0', '3.99.99'],
+  ['3.25.0', '3.29.99'],
+  ['3.30.0', '3.39.99'],
+  ['3.40.0', '3.49.99'],
+  ['3.50.0', '3.59.99'],
+  ['3.60.0', '3.69.99'],
+  ['3.70.0', '3.79.99'],
+  ['3.80.0', '3.89.99'],
+  ['3.90.0', '3.99.99'],
   ['4.0.0', '9.0.0'],
 ]
 
