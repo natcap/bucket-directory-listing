@@ -115,6 +115,7 @@ function locationToPrefix(loc) {
 
 function buildNavigation() {
   // Build links that can be parsed for a 'prefix=' query parameter.
+  console.log('building navigation');
   const root = '<a href="/">' + location.host + '</a> / ';
   let content = [];
   let prefix = locationToPrefix(location)
@@ -174,6 +175,7 @@ function prepareTableHeader() {
 }
 
 function prepareTable(info, sortFunc) {
+  console.log('preparing table');
   // info is the json API response.
   // Returns preformatted text for use inside <pre></pre> tags
   let dirs = info.prefixes
@@ -231,14 +233,8 @@ function prepareTable(info, sortFunc) {
 
 // objects are compared to offset ranges in lexicographic order.
 // These ranges ensure no overlap among each other,
-// and allow for 989 bugfix versions per minor version.
+// and minimize the need for sequential, paginated requests
 const INVEST_OFFSETS = [
-  ['3.0.0', '3.0.99'],
-  ['3.1.0', '3.1.99'],
-  ['3.2.0', '3.2.99'],
-  ['3.3.0', '3.3.99'],
-  ['3.4.0', '3.4.99'],
-  ['3.5.0', '3.5.99'],
   ['3.6.0', '3.6.99'],
   ['3.7.0', '3.7.99'],
   ['3.8.0', '3.8.99'],
@@ -269,7 +265,7 @@ const INVEST_OFFSETS = [
   ['4.0.0', '9.0.0'],
 ]
 
-function getS3Data(pageToken, startOffset, endOffset, storageObjects={prefixes: [], items: []}) {
+function getS3Data(pageToken, offsetRange, storageObjects={prefixes: [], items: []}) {
   // fetches JSON format bucket metadata from bucket's endpoint.
   // all parameters are optional
   // pageToken should be used in conjunction with the same start and endOffset
@@ -292,11 +288,9 @@ function getS3Data(pageToken, startOffset, endOffset, storageObjects={prefixes: 
   }
   if (pageToken) {
     gcs_rest_url += '&pageToken=' + pageToken
-    if (startOffset) {
-      gcs_rest_url += `&startOffset=${startOffset}`
-    }
-    if (endOffset) {
-      gcs_rest_url += `&endOffset=${endOffset}`
+    if (offsetRange) {
+      gcs_rest_url += `&startOffset=${offsetRange[0]}`
+      gcs_rest_url += `&endOffset=${offsetRange[1]}`
     }
     urlArray.push(gcs_rest_url);
   } else if (prefix == 'invest/') {
@@ -309,6 +303,13 @@ function getS3Data(pageToken, startOffset, endOffset, storageObjects={prefixes: 
   } else {
     urlArray.push(gcs_rest_url);
   }
+  if (!URL_ARRAY) {
+    URL_ARRAY = Object.assign([], urlArray);
+  }
+
+  const sortName = CONFIG.prefix_sort_map[
+    prefix.split('/').slice(-2).join('/')
+  ];
 
   Promise.all(urlArray.map(url => fetch(url)))
     .then((responses) => {
@@ -327,26 +328,31 @@ function getS3Data(pageToken, startOffset, endOffset, storageObjects={prefixes: 
           if (data.items) {
             objects['items'].push(...data['items'])
           }
+          const params = new URLSearchParams(urlArray[idx]);
           if (data.nextPageToken) {
-            const params = new URLSearchParams(urlArray[idx]);
             const startOffset = params.get('startOffset');
             const endOffset = params.get('endOffset');
-            getS3Data(data.nextPageToken, startOffset, endOffset, objects)
+            getS3Data(data.nextPageToken, [startOffset, endOffset], objects)
+          } else {
+            const previousToken = params.get('pageToken');
+            const originalUrl = urlArray[idx].replace(`&pageToken=${previousToken}`, '');
+            URL_ARRAY = URL_ARRAY.filter(item => item !== originalUrl);
           }
         });
       })
       .then(() => {
-        const html = prepareTable(objects, sortFuncs[sortName]);
-        document.getElementById('listing')
-          .innerHTML = '<pre>' + prepareTableHeader() + html + '</pre>';
+        if (!URL_ARRAY.length) {
+          const html = prepareTable(objects, sortFuncs[sortName]);
+          document.getElementById('listing')
+            .innerHTML = '<pre>' + prepareTableHeader() + html + '</pre>';
+        }
       })
     })
-    buildNavigation();
-    const sortName = CONFIG.prefix_sort_map[
-      prefix.split('/').slice(-2).join('/')
-    ];
 }
 
 const COLS = [45, 30, 15];
+let URL_ARRAY;
 getS3Data();
-
+// navigation only depends on `location`, so it can build on page load
+// even if bucket data is still loading
+buildNavigation();
