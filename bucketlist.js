@@ -342,7 +342,7 @@ function getBucketData(pageToken, offsetRange, storageObjects={prefixes: [], ite
           if (data.nextPageToken) {
             const startOffset = params.get('startOffset');
             const endOffset = params.get('endOffset');
-            getS3Data(data.nextPageToken, [startOffset, endOffset], objects)
+            getBucketData(data.nextPageToken, [startOffset, endOffset], objects)
           } else {
             const previousToken = params.get('pageToken');
             const originalUrl = urlArray[idx].replace(`&pageToken=${previousToken}`, '');
