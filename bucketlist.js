@@ -42,25 +42,40 @@ function sortFilesFunction(a, b) {
 
 const sortFuncs = {
   semver: function(a, b) {
+    // split into <major>.<minor>.<bugfix>.<post / dev>
     const semverA = a.split('/').slice(-2).join('').split('.');
     const semverB = b.split('/').slice(-2).join('').split('.');
 
+    // simple comparison based on major, minor, bugfix numbers
     for (let i = 0; i < 3; i++) {
       if (semverA[i] !== semverB[i]) {
         const numA = Number(semverA[i]);
         const numB = Number(semverB[i]);
-        if (isNaN(numA)) { console.log(semverA[i]); return 1 }
-        if (isNaN(numB)) { console.log(semverB[i]); return -1 }
+
+        // an 'a' for alpha is part of the bugfix number on rare occassions
+        // if it's NaN, just don't bother trying
+        if (isNaN(numA)) { return 1 }
+        if (isNaN(numB)) { return -1 }
+        
         return numA < numB ? 1 : -1
       }
     }
-    let postA = semverA[3] ? semverA[3] : 0;
-    let postB = semverB[3] ? semverB[3] : 0;
-    if (postA === 0) { return 1 };
-    if (postB === 0) { return -1 };
-    postA = Number(semverA[3].split('+')[0].replace('post', ''));
-    postB = Number(semverB[3].split('+')[0].replace('post', ''));
-    return postA < postB ? 1 : -1
+    // if versions are the same down to the bugfix,
+    let suffixA = semverA[3] ? semverA[3] : '';
+    let suffixB = semverB[3] ? semverB[3] : '';
+    if (suffixA.startsWith('post') || suffixB.startsWith('post')) {
+      // 3.4.5.post* goes after 3.4.5
+      if (suffixA === '') { return 1 };
+      if (suffixB === '') { return -1 };
+    }
+    if (suffixA.startsWith('dev') || suffixB.startsWith('dev')) {
+      // 3.4.5.dev* goes before 3.4.5
+      if (suffixA === '') { return -1 };
+      if (suffixB === '') { return 1 };
+    }
+    const intA = Number(suffixA.split('+')[0].replace(/post|dev/, ''));
+    const intB = Number(suffixB.split('+')[0].replace(/post|dev/, ''));
+    return intA < intB ? 1 : -1
   }
 }
 
@@ -214,13 +229,63 @@ function prepareTable(info, sortFunc) {
   return content.join('');
 }
 
-function createS3QueryUrl(pageToken, maxResults) {
-  // Build an API query by parsing a url for prefix= query parameter
-  // and append param to the API endpoint.
-  // pageToken and maxResults parameters are both optional.
+// objects are compared to offset ranges in lexicographic order.
+// These ranges ensure no overlap among each other,
+// and minimize the need for sequential, paginated requests.
+// Start is inclusive, end is not, hence the trailing z.
+const INVEST_OFFSETS = [
+  ['3.6.0', '3.6.9z'],
+  ['3.7.0', '3.7.9z'],
+  ['3.8.0', '3.8.9z'],
+  ['3.9.0', '3.9.9z'],
+  ['3.10.0', '3.10.9z'],
+  ['3.11.0', '3.11.9z'],
+  ['3.12.0', '3.12.9z'],
+  ['3.13.0', '3.13.9z'],
+  ['3.14.0', '3.14.0z'],
+  ['3.14.1', '3.14.1z'],
+  ['3.14.2', '3.14.2z'],
+  ['3.14.3', '3.14.9z'],
+  ['3.15.0', '3.15.9z'],
+  ['3.16.0', '3.16.0z'],
+  ['3.16.1', '3.16.1z'],
+  ['3.16.2', '3.16.2z'],
+  ['3.16.3', '3.16.9z'],
+  ['3.17.0', '3.17.0z'],
+  ['3.17.1', '3.17.1z'],
+  ['3.17.2', '3.17.2z'],
+  ['3.17.3', '3.17.9z'],
+  ['3.18.0', '3.18.9z'],
+  ['3.19.0', '3.19.9z'],
+  ['3.20.0', '3.20.9z'],
+  ['3.21.0', '3.21.9z'],
+  ['3.22.0', '3.22.9z'],
+  ['3.23.0', '3.23.9z'],
+  ['3.24.0', '3.24.9z'],
+  ['3.25.0', '3.29.9z'],
+  ['3.30.0', '3.39.9z'],
+  ['3.40.0', '3.49.9z'],
+  ['3.50.0', '3.59.9z'],
+  ['3.60.0', '3.69.9z'],
+  ['3.70.0', '3.79.9z'],
+  ['3.80.0', '3.89.9z'],
+  ['3.90.0', '3.99.9z'],
+  ['4.0.0', '9z'],
+]
+
+function getBucketData(pageToken, offsetRange, storageObjects={prefixes: [], items: []}) {
+  // fetches JSON format bucket metadata from bucket's endpoint.
+  // all parameters are optional
+  // pageToken should be used in conjunction with the same start and endOffset
+  // that were used in the prior query that returned the nextPageToken.
+  const maxResults = 1000;
+  let objects = {prefixes: [], items: []};
+  Object.assign(objects, storageObjects);
   let gcs_rest_url = CONFIG.bucket_url;
-  gcs_rest_url += '?delimiter=/';
+  let urlArray = [];
   let prefix = locationToPrefix(location);
+  gcs_rest_url += '?delimiter=/';
+
   if (prefix) {
     // make sure we end in /
     prefix = prefix.replace(/\/$/, '') + '/';
@@ -230,45 +295,70 @@ function createS3QueryUrl(pageToken, maxResults) {
     gcs_rest_url += '&maxResults=' + maxResults
   }
   if (pageToken) {
-    gcs_rest_url += '&pageToken=' + pageToken;
+    gcs_rest_url += '&pageToken=' + pageToken
+    if (offsetRange) {
+      gcs_rest_url += `&startOffset=${offsetRange[0]}`
+      gcs_rest_url += `&endOffset=${offsetRange[1]}`
+    }
+    urlArray.push(gcs_rest_url);
+  } else if (prefix == 'invest/') {
+      urlArray = INVEST_OFFSETS.map(([start, end]) => {
+        let url = gcs_rest_url;
+        url += `&startOffset=invest/${start}`
+        url += `&endOffset=invest/${end}`
+        return url;
+      })
+  } else {
+    urlArray.push(gcs_rest_url);
   }
-  return [ gcs_rest_url, prefix ];
-}
+  if (!URL_ARRAY) {
+    URL_ARRAY = Object.assign([], urlArray);
+  }
 
-function getS3Data(pageToken, storageObjects={prefixes: [], items: []}) {
-  // fetches JSON format bucket metadata from bucket's endpoint.
-  // pageToken and html parameters are optional
-  // and are only used in the event the query requests > 1000 objects.
-  let [ gcs_rest_url, prefix ] = createS3QueryUrl(pageToken);
-  fetch(gcs_rest_url)
-  	.then(function(response) {
-      if (response.status === 200) {
-        return response.json();  
-      } else {
-        console.log(response.status);
-      }
-  	})
-  	.then(function(data) {
-      if (data.prefixes) {
-        storageObjects['prefixes'].push(...data['prefixes'])
-      }
-      if (data.items) {
-        storageObjects['items'].push(...data['items'])
-      }
-  		buildNavigation();
-      const sortName = CONFIG.prefix_sort_map[
-        prefix.split('/').slice(-2).join('/')
-      ];
-      if (data.nextPageToken) {
-        getS3Data(data.nextPageToken, storageObjects)
-      } else {
-        const html = prepareTable(storageObjects, sortFuncs[sortName]);
-        document.getElementById('listing')
-          .innerHTML = '<pre>' + prepareTableHeader() + html + '</pre>';
-      }
-  	})
+  const sortName = CONFIG.prefix_sort_map[
+    prefix.split('/').slice(-2).join('/')
+  ];
+
+  Promise.all(urlArray.map(url => fetch(url)))
+    .then((responses) => {
+      Promise.all(responses.map(response => {
+        if (response.status === 200) {
+          return response.json();  
+        } else {
+          console.log(response.status);
+        }
+      }))
+      .then((dataArray) => {
+        dataArray.forEach((data, idx) => {
+          if (data.prefixes) {
+            objects['prefixes'].push(...data['prefixes'])
+          }
+          if (data.items) {
+            objects['items'].push(...data['items'])
+          }
+          const params = new URLSearchParams(urlArray[idx]);
+          if (data.nextPageToken) {
+            const startOffset = params.get('startOffset');
+            const endOffset = params.get('endOffset');
+            getBucketData(data.nextPageToken, [startOffset, endOffset], objects)
+          } else {
+            const previousToken = params.get('pageToken');
+            const originalUrl = urlArray[idx].replace(`&pageToken=${previousToken}`, '');
+            URL_ARRAY = URL_ARRAY.filter(item => item !== originalUrl);
+          }
+        });
+      })
+      .then(() => {
+        if (!URL_ARRAY.length) {
+          const html = prepareTable(objects, sortFuncs[sortName]);
+          document.getElementById('listing')
+            .innerHTML = '<pre>' + prepareTableHeader() + html + '</pre>';
+        }
+      })
+    })
 }
 
 const COLS = [45, 30, 15];
-getS3Data();
-
+let URL_ARRAY;
+getBucketData();
+buildNavigation();
