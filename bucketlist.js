@@ -115,7 +115,6 @@ function locationToPrefix(loc) {
 
 function buildNavigation() {
   // Build links that can be parsed for a 'prefix=' query parameter.
-  console.log('building navigation');
   const root = '<a href="/">' + location.host + '</a> / ';
   let content = [];
   let prefix = locationToPrefix(location)
@@ -175,7 +174,6 @@ function prepareTableHeader() {
 }
 
 function prepareTable(info, sortFunc) {
-  console.log('preparing table');
   // info is the json API response.
   // Returns preformatted text for use inside <pre></pre> tags
   let dirs = info.prefixes
