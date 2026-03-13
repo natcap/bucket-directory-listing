@@ -233,39 +233,49 @@ function prepareTable(info, sortFunc) {
 
 // objects are compared to offset ranges in lexicographic order.
 // These ranges ensure no overlap among each other,
-// and minimize the need for sequential, paginated requests
+// and minimize the need for sequential, paginated requests.
+// Start is inclusive, end is not, hence the trailing z.
 const INVEST_OFFSETS = [
-  ['3.6.0', '3.6.99'],
-  ['3.7.0', '3.7.99'],
-  ['3.8.0', '3.8.99'],
-  ['3.9.0', '3.9.99'],
-  ['3.10.0', '3.10.99'],
-  ['3.11.0', '3.11.99'],
-  ['3.12.0', '3.12.99'],
-  ['3.13.0', '3.13.99'],
-  ['3.14.0', '3.14.99'],
-  ['3.15.0', '3.15.99'],
-  ['3.16.0', '3.16.99'],
-  ['3.17.0', '3.17.99'],
-  ['3.18.0', '3.18.99'],
-  ['3.19.0', '3.19.99'],
-  ['3.20.0', '3.20.99'],
-  ['3.21.0', '3.21.99'],
-  ['3.22.0', '3.22.99'],
-  ['3.23.0', '3.23.99'],
-  ['3.24.0', '3.24.99'],
-  ['3.25.0', '3.29.99'],
-  ['3.30.0', '3.39.99'],
-  ['3.40.0', '3.49.99'],
-  ['3.50.0', '3.59.99'],
-  ['3.60.0', '3.69.99'],
-  ['3.70.0', '3.79.99'],
-  ['3.80.0', '3.89.99'],
-  ['3.90.0', '3.99.99'],
-  ['4.0.0', '9.0.0'],
+  ['3.6.0', '3.6.9z'],
+  ['3.7.0', '3.7.9z'],
+  ['3.8.0', '3.8.9z'],
+  ['3.9.0', '3.9.9z'],
+  ['3.10.0', '3.10.9z'],
+  ['3.11.0', '3.11.9z'],
+  ['3.12.0', '3.12.9z'],
+  ['3.13.0', '3.13.9z'],
+  ['3.14.0', '3.14.0z'],
+  ['3.14.1', '3.14.1z'],
+  ['3.14.2', '3.14.2z'],
+  ['3.14.3', '3.14.9z'],
+  ['3.15.0', '3.15.9z'],
+  ['3.16.0', '3.16.0z'],
+  ['3.16.1', '3.16.1z'],
+  ['3.16.2', '3.16.2z'],
+  ['3.16.3', '3.16.9z'],
+  ['3.17.0', '3.17.0z'],
+  ['3.17.1', '3.17.1z'],
+  ['3.17.2', '3.17.2z'],
+  ['3.17.3', '3.17.9z'],
+  ['3.18.0', '3.18.9z'],
+  ['3.19.0', '3.19.9z'],
+  ['3.20.0', '3.20.9z'],
+  ['3.21.0', '3.21.9z'],
+  ['3.22.0', '3.22.9z'],
+  ['3.23.0', '3.23.9z'],
+  ['3.24.0', '3.24.9z'],
+  ['3.25.0', '3.29.9z'],
+  ['3.30.0', '3.39.9z'],
+  ['3.40.0', '3.49.9z'],
+  ['3.50.0', '3.59.9z'],
+  ['3.60.0', '3.69.9z'],
+  ['3.70.0', '3.79.9z'],
+  ['3.80.0', '3.89.9z'],
+  ['3.90.0', '3.99.9z'],
+  ['4.0.0', '9z'],
 ]
 
-function getS3Data(pageToken, offsetRange, storageObjects={prefixes: [], items: []}) {
+function getBucketData(pageToken, offsetRange, storageObjects={prefixes: [], items: []}) {
   // fetches JSON format bucket metadata from bucket's endpoint.
   // all parameters are optional
   // pageToken should be used in conjunction with the same start and endOffset
@@ -352,7 +362,5 @@ function getS3Data(pageToken, offsetRange, storageObjects={prefixes: [], items: 
 
 const COLS = [45, 30, 15];
 let URL_ARRAY;
-getS3Data();
-// navigation only depends on `location`, so it can build on page load
-// even if bucket data is still loading
+getBucketData();
 buildNavigation();
